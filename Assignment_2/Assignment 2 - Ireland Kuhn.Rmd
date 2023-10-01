@@ -1,0 +1,83 @@
+---
+title: "Assignment 2 Ireland Kuhn"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+
+```{r}
+library(caret)
+library(class)
+library(dplyr)
+data <- read.csv("C:\\Users\\Ireland\\Downloads\\UniversalBank.csv")
+library(ISLR)               
+```
+
+```{r}
+bank_data <- select(data,Age,Experience,Income,Personal.Loan,Family,CCAvg,Education,Mortgage,Securities.Account,CD.Account,Online,CreditCard)
+```
+
+```{r}
+set.seed(123)  
+training_Index <- createDataPartition(bank_data$Personal.Loan, p = 0.6, list = FALSE)
+training_data <- bank_data[training_Index, ]
+validation_data <- bank_data[-training_Index, ]
+```
+
+```{r}
+k <- 1
+predictors <- select(training_data, -Personal.Loan)
+target <- training_data$Personal.Loan
+
+predicted_class <- knn(predictors, select(validation_data, -Personal.Loan), target, k = k)
+```
+
+```{r}
+library(gmodels)
+confusion_matrix <- CrossTable(validation_data$Personal.Loan, predicted_class, prop.chisq = FALSE)
+print(confusion_matrix)
+```
+
+```{r}
+control <- trainControl(method = "cv", number = 5)
+k_values <- seq(1, 20, by = 2)  
+
+model <- train(Personal.Loan ~ ., data = training_data, method = "knn", trControl = control, tuneGrid = data.frame(k = k_values))
+best_k <- model$bestTune$k
+print(paste("Best k:", best_k))
+```
+```{r}
+new_customer <- data.frame(Age = 40, Experience = 10, Income = 84, Family = 2, CCAvg = 2,
+                            Education = 2, Mortgage = 0, Securities.Account = 0, CD.Account = 0, Online = 1, CreditCard = 1)
+new_customer_pred <- knn(predictors, new_customer, target, k = best_k)
+print(paste("Classification for the new customer:", ifelse(new_customer_pred == 1, "Accepted", "Not Accepted")))
+```
+```{r}
+set.seed(123)  
+training_Index2 <- createDataPartition(bank_data$Personal.Loan, p = 0.5, list = FALSE)
+training_data2 <- bank_data[training_Index2, ]
+temp_data2 <- bank_data[-training_Index2, ]
+validation_Index2 <- createDataPartition(temp_data2$Personal.Loan, p = 0.6, list = FALSE)
+validation_data2 <- temp_data2[validation_Index2, ]
+test_data2 <- temp_data2[-validation_Index2, ]
+```
+```{r}
+test_predictors <- select(training_data2, -Personal.Loan)
+test_target <- training_data2$Personal.Loan
+test_pred <- knn(test_predictors, select(test_data2, -Personal.Loan), test_target, k = best_k)
+
+```
+```{r}
+confusion_matrix_test <- CrossTable(test_data2$Personal.Loan, test_pred, prop.chisq = FALSE)
+print("Confusion Matrix for Test Set:")
+print(confusion_matrix_test)
+```
+```{r}
+# The accuracy of the validation set is 89.9% compared to 89.2% for the test set. The model performs similarly on both the validation and test sets, indicating consistent overall performance.
+# The model performs similarly on both the validation and test sets, indicating consistent overall performance.
+# Sensitivity is lower in the test set (35.5%) compared to the validation set (47.5%). This suggests that the model is less effective at identifying true positives in the test set. Specificity is higher in the test set (98.8%) compared to the validation set (95.3%). This indicates that the model is very good at correctly identifying true negatives in the test set. Precision is higher in the test set (64.5%) compared to the validation set (52.5%). When the model predicts positive, it is more likely to be correct in the test set.
+# The model seems to generalize well from the validation set to the test set, as the accuracy is consistent. The drop in sensitivity in the test set suggests that the model might not be as effective at identifying customers who accepted the loan. The increase in specificity in the test set suggests that the model is good at avoiding false positives (correctly identifying customers who did not accept the loan). The higher precision in the test set indicates that when the model predicts positive, it is more likely to be correct.
+
+```
+
