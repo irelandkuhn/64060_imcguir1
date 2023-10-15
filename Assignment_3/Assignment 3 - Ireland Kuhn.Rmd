@@ -1,0 +1,108 @@
+---
+title: "Assignment 3 Ireland Kuhn"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+
+```{r}
+library(e1071)
+library(caret)
+library(class)
+library(dplyr)
+library(ISLR)
+library(readr)
+bank_data <- read.csv("C:\\Users\\Ireland\\Downloads\\UniversalBank.csv")
+```
+
+```{r}
+set.seed(123)  
+training_Index <- createDataPartition(bank_data$Personal.Loan, p = 0.6, list = FALSE)
+training_data <- bank_data[training_Index, ]
+validation_data <- bank_data[-training_Index, ]
+```
+
+```{r}
+library(reshape2)
+melted_data <- melt(training_data, id.vars = c("Online", "CreditCard", "Personal.Loan"))
+pivot_table <- dcast(melted_data, CreditCard ~ Online + Personal.Loan, fun.aggregate = length)
+
+print(pivot_table)
+```
+
+```{r}
+# count of customers who accepted the loan offer
+count_accepted_loan <- pivot_table[2, 4] 
+
+# total count of customers with bank credit card and active online banking
+total_customers <- sum(pivot_table[2, c(2, 4)]) 
+
+# probability
+probability_loan_acceptance <- count_accepted_loan / total_customers 
+
+cat("Probability of loan acceptance given CC=1 and Online=1:", probability_loan_acceptance, "\n")
+```
+```{r}
+melted_online <- melt(training_data, id.vars = c("Personal.Loan", "Online"))
+pivot_table_online <- dcast(melted_online, Personal.Loan ~ Online, fun.aggregate = length)
+
+melted_credit_card <- melt(training_data, id.vars = c("Personal.Loan", "CreditCard"))
+pivot_table_credit_card <- dcast(melted_credit_card, Personal.Loan ~ CreditCard, fun.aggregate = length)
+
+```
+```{r}
+print("Pivot Table for Loan as a function of Online:")
+print(pivot_table_online)
+```
+```{r}
+print("Pivot Table for Loan as a function of CreditCard:")
+print(pivot_table_credit_card)
+```
+```{r}
+
+# i. 
+p_cc_given_loan_1 <- pivot_table_credit_card[2, 2] / sum(pivot_table_credit_card[, 2])
+# ii. 
+p_online_given_loan_1 <- pivot_table_online[2, 2] / sum(pivot_table_online[, 2])
+# iii.
+p_loan_1 <- sum(pivot_table_credit_card[, 2]) / sum(pivot_table_credit_card)
+# iv.
+p_cc_given_loan_0 <- pivot_table_credit_card[2, 1] / sum(pivot_table_credit_card[, 1])
+# v. 
+p_online_given_loan_0 <- pivot_table_online[2, 1] / sum(pivot_table_online[, 1])
+# vi. 
+p_loan_0 <- sum(pivot_table_credit_card[, 1]) / sum(pivot_table_credit_card)
+cat("i.  P(CC = 1 | Loan = 1):", p_cc_given_loan_1, "\n")
+cat("ii. P(Online = 1 | Loan = 1):", p_online_given_loan_1, "\n")
+cat("iii. P(Loan = 1):", p_loan_1, "\n")
+cat("iv. P(CC = 1 | Loan = 0):", p_cc_given_loan_0, "\n")
+cat("v.  P(Online = 1 | Loan = 0):", p_online_given_loan_0, "\n")
+cat("vi. P(Loan = 0):", p_loan_0, "\n")
+```
+```{r}
+p_loan_1_given_cc_online <- p_loan_1 * p_cc_given_loan_1 * p_online_given_loan_1
+p_loan_1_given_cc_online_normalized <- p_loan_1_given_cc_online / sum(c(p_loan_1_given_cc_online, p_loan_0 * p_cc_given_loan_0 * p_online_given_loan_0))
+cat("P(Loan = 1 | CC = 1, Online = 1):", p_loan_1_given_cc_online_normalized, "\n")
+```
+```{r}
+#  Keeping in mind that the Naive Bayes estimates make assumptions about independence that may or may not hold in our specific dataset, the pivot table estimate is a direct count from the observed data therefore it is more accurate.
+```
+
+```{r}
+library(e1071)
+naive_bayes_model <- naiveBayes(Personal.Loan ~ CreditCard + Online, data = training_data)
+train_predictions <- predict(naive_bayes_model, training_data, type = "raw")
+head(train_predictions)
+```
+
+
+```{r}
+library(pROC)
+roc(training_data$Personal.Loan, train_predictions[,2])
+plot.roc(training_data$Personal.Loan,train_predictions[,2])
+```
+```{r}
+# Given the AUC of 0.5336, it suggests that the discriminatory power of our model is relatively low. This means that the model is not very effective at distinguishing between the positive and negative classes based on the chosen features. 
+```
+
