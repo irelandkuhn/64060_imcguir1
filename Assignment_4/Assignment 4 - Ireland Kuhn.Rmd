@@ -1,0 +1,76 @@
+---
+title: "Assignment 4"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+```{r}
+library(tidyverse)
+library(scales)
+library(factoextra)
+library(cluster)
+pharma_data <- read.csv("C:\\Users\\Ireland\\Downloads\\Pharmaceuticals.csv")
+```
+
+```{r}
+numerical_data <- pharma_data[,3:11]
+
+scaled_data <- scale(numerical_data)
+cor_matrix <- cor(numerical_data)
+print(cor_matrix)
+```
+
+```{r}
+fviz_nbclust(scaled_data, kmeans, method = "wss") +
+  geom_vline(xintercept = 3, linetype = 2) +
+  labs(subtitle = "Elbow Method")
+```
+```{r}
+# I chose all numeric variables for clustering because they are key financial indicators that reflect the company’s size, valuation, and profitability. I did not apply weights as I considered all selected features to be equally important for this analysis. The Elbow Method helped in determining the optimal number of clusters, ensuring a balance between precision and computational efficiency. As seen in the Elbow Method plot, the optimal number of clusters is three, where the reduction in within-cluster sum of squares starts to diminish, indicating that adding more clusters doesn’t provide significant benefits. #
+```
+
+```{r}
+set.seed(42)
+kmeans_result <- kmeans(scaled_data, centers = 3, nstart = 25)
+pharma_data$Cluster <- as.factor(kmeans_result$cluster)
+
+head(pharma_data)
+```
+```{r}
+numerical_analysis <- aggregate(numerical_data, by=list(Cluster=kmeans_result$cluster), mean)
+```
+```{r}
+mode_stat <- function(x) {
+  tbl <- table(x)
+  name <- names(tbl)[which.max(tbl)]
+  if (is.null(name)) {
+    return(NA)
+  } else {
+    return(name)
+  }
+}
+
+
+non_numerical_data <- pharma_data[,c(12:14, 15)]
+non_numerical_analysis <- aggregate(non_numerical_data[-4], by=non_numerical_data[4], mode_stat)
+```
+```{r}
+print(non_numerical_analysis)
+print(numerical_analysis)
+```
+
+
+```{r}
+# Cluster 1: High-Growth Moderate Profitability - High expected revenue growth and moderate profitability - moderately positive outlook.
+
+# Cluster 2: Stable Large Profitability - Large, stable companies with high profitability and asset efficiency - moderate expected revenue growth, and analysts suggest holding these stocks.
+
+# Cluster 3: Risky Mid Profitability - Mid-sized, highly leveraged companies with high volatility and lower profitability- analysts suggest holding these stocks due to their riskier nature.
+
+cluster_names <- c("High-Growth Moderate Pofitabilty", "Stable Large Profitability", "Risky Mid Proitability")
+pharma_data$Cluster_Name <- factor(pharma_data$Cluster, labels = cluster_names)
+
+head(pharma_data)
+```
+
