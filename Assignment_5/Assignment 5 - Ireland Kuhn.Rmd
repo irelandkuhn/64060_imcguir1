@@ -1,0 +1,104 @@
+---
+title: "Assignment 5 Ireland Kuhn"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+
+```{r}
+cereals <- read.csv("C:\\Users\\Ireland\\Downloads\\Cereals.csv")
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(cluster)
+```
+```{r}
+cereals_clean <- na.omit(cereals)
+
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+nutritional_columns <- c("calories", "protein", "fat", "sodium", "fiber", "carbo", "sugars", "potass", "vitamins")
+cereals_clean[nutritional_columns] <- lapply(cereals_clean[nutritional_columns], normalize)
+```
+
+```{r}
+methods <- c("single", "complete", "average", "ward.D2")
+
+perform_clustering <- function(method, data) {
+  hc <- hclust(dist(data), method = method)
+  plot(hc, main = paste("Dendrogram using", method, "linkage"))
+}
+
+for (method in methods) {
+  perform_clustering(method, cereals_clean[nutritional_columns])
+}
+```
+
+```{r}
+num_clusters <- 4
+
+clusters_ward <- cutree(hclust(dist(cereals_clean[nutritional_columns]), method = "ward.D2"), k = num_clusters)
+
+cereals_clean$Cluster_Ward <- clusters_ward
+```
+
+```{r}
+hc_full <- hclust(dist(cereals_clean[nutritional_columns]), method = "ward.D2")
+clusters_full <- cutree(hc_full, k = num_clusters)
+cereals_clean$Cluster_Full <- clusters_full
+
+set.seed(42)
+train_indices <- sample(1:nrow(cereals_clean), size = nrow(cereals_clean) / 2)
+train_data <- cereals_clean[train_indices, ]
+test_data <- cereals_clean[-train_indices, ]
+```
+
+
+```{r}
+train_centroids <- aggregate(train_data[nutritional_columns], by=list(Cluster=train_data$Cluster_Full), mean)
+
+find_closest_centroid <- function(record, centroids) {
+  distances <- apply(centroids[, -1], 1, function(centroid) sum((record - centroid)^2))
+  return(which.min(distances))
+}
+
+test_data$Cluster_Assigned <- apply(test_data[nutritional_columns], 1, function(x) find_closest_centroid(x, train_centroids))
+
+original_test_clusters <- test_data$Cluster_Full
+
+consistency <- mean(test_data$Cluster_Assigned == original_test_clusters)
+consistency_percentage <- consistency * 100
+print(paste("Consistency: ", consistency_percentage, "%"))
+```
+```{r}
+# A consistency of approximately 97.3% means that when the data was split into two parts (training and testing), and clustering was performed separately on these parts, about 97.3% of the cereals in the testing set were assigned to the same clusters as they were when the entire dataset was used for clustering. This indicates that my hierarchical clustering model using Ward's method has done a good job at reliably grouping cereals based on their nutritional profiles. This result provides strong support for the choices and recommendations one might make based on these clusters. 
+```
+
+```{r}
+cluster_summary_ward <- aggregate(cereals_clean[nutritional_columns], by=list(Cluster=cereals_clean$Cluster_Ward), mean)
+print(cluster_summary_ward)
+```
+
+```{r}
+# Cluster 4: Lower in calories, fat, sodium, and sugar, moderate protein, higher fiber content than Clusters 2 and 3.
+
+# Cluster 3: Moderate in calories, protein, sugar and fiber content, higher sodium content compared to other clusters, lower potassium and vitamin levels.
+
+# Cluster 2: Higher in calories,lower protein and fiber content, highest fat content and sugar among all clusters, moderate sodium content.
+
+# Cluster 1: Higher in calories and fat, highest protein, fiber, potassium and vitamins, moderate sodium content, moderate to high sugar content.
+
+```
+
+```{r}
+healthy_cluster <- cluster_summary_ward[cluster_summary_ward$Cluster == 4, ]
+print(healthy_cluster)
+
+# Listing cereals in the healthy cluster
+healthy_cereals <- cereals_clean[cereals_clean$Cluster_Ward == 4, ]
+print(healthy_cereals$name)
+```
+
